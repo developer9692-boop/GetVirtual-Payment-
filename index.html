@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>GetVirtual AI — Payment</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  /* ── Fonts ─────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&display=swap');
+
+  /* ── Variables ─────────────────────────────────────── */
+  :root {
+    --bg:       #0a0d14;
+    --surface:  #111622;
+    --card:     #171e2e;
+    --border:   rgba(255,255,255,0.07);
+    --accent:   #5b8def;
+    --accent2:  #7f5af0;
+    --success:  #2cb67d;
+    --text:     #e8eaf6;
+    --muted:    #8892b0;
+    --danger:   #ef5675;
+    --radius:   16px;
+    --glow:     0 0 32px rgba(91,141,239,0.18);
+  }
+
+  /* ── Reset ─────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Grid noise bg ─────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image:
+      linear-gradient(rgba(91,141,239,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(91,141,239,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+  }
+
+  /* ── Blob glow ─────────────────────────────────────── */
+  .blob {
+    position: fixed; border-radius: 50%; filter: blur(90px); pointer-events: none; z-index: 0;
+  }
+  .blob-1 { width: 320px; height: 320px; background: rgba(91,141,239,0.12); top: -80px; right: -80px; }
+  .blob-2 { width: 260px; height: 260px; background: rgba(127,90,240,0.10); bottom: 40px; left: -60px; }
+
+  /* ── Layout ────────────────────────────────────────── */
+  .page {
+    position: relative; z-index: 1;
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 24px 16px 40px;
+    max-width: 480px; margin: 0 auto;
+  }
+
+  /* ── Header ────────────────────────────────────────── */
+  .header {
+    width: 100%;
+    display: flex; align-items: center; gap: 12px;
+    margin-bottom: 28px;
+  }
+  .logo-icon {
+    width: 44px; height: 44px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px; flex-shrink: 0;
+    box-shadow: var(--glow);
+  }
+  .logo-text { line-height: 1.2; }
+  .logo-text h1 {
+    font-family: 'Syne', sans-serif;
+    font-size: 17px; font-weight: 800; letter-spacing: -0.3px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .logo-text span { font-size: 12px; color: var(--muted); font-weight: 300; }
+
+  .status-badge {
+    margin-left: auto;
+    background: rgba(44,182,125,0.12);
+    color: var(--success);
+    border: 1px solid rgba(44,182,125,0.25);
+    border-radius: 100px;
+    padding: 4px 10px;
+    font-size: 11px; font-weight: 500;
+    display: flex; align-items: center; gap: 5px;
+  }
+  .status-badge::before {
+    content: '';
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Order card ────────────────────────────────────── */
+  .order-card {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 16px;
+    animation: slideUp 0.4s ease both;
+  }
+  @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:none} }
+
+  .order-card .label {
+    font-size: 11px; font-weight: 500; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 12px;
+  }
+  .order-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .order-row:last-child { border-bottom: none; }
+  .order-row .key { font-size: 13px; color: var(--muted); }
+  .order-row .val {
+    font-size: 13px; font-weight: 500; color: var(--text);
+    font-family: 'Syne', sans-serif;
+  }
+  .price-val {
+    font-size: 20px !important; font-weight: 700 !important;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+
+  /* ── QR section ────────────────────────────────────── */
+  .qr-section {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px;
+    margin-bottom: 16px;
+    animation: slideUp 0.4s 0.08s ease both;
+  }
+  .qr-label {
+    font-size: 13px; font-weight: 500; color: var(--muted);
+    text-align: center;
+  }
+  .qr-frame {
+    position: relative;
+    width: 180px; height: 180px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 2px solid var(--border);
+  }
+  .qr-frame img {
+    width: 100%; height: 100%; object-fit: contain;
+    background: #fff;
+    padding: 8px;
+  }
+  /* corner accents */
+  .qr-frame::before, .qr-frame::after {
+    content: ''; position: absolute;
+    width: 20px; height: 20px;
+    border-color: var(--accent);
+    border-style: solid;
+    z-index: 2;
+  }
+  .qr-frame::before { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
+  .qr-frame::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+  .upi-id {
+    font-family: monospace; font-size: 13px;
+    background: rgba(91,141,239,0.1);
+    border: 1px solid rgba(91,141,239,0.2);
+    border-radius: 8px; padding: 8px 14px;
+    color: var(--accent); cursor: pointer; user-select: all;
+    transition: background 0.2s;
+  }
+  .upi-id:active { background: rgba(91,141,239,0.2); }
+  .upi-hint { font-size: 11px; color: var(--muted); text-align: center; line-height: 1.5; }
+
+  /* ── Form ──────────────────────────────────────────── */
+  .form-section {
+    width: 100%;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 16px;
+    margin-bottom: 20px;
+    animation: slideUp 0.4s 0.14s ease both;
+  }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-group label {
+    font-size: 12px; font-weight: 500; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.8px;
+  }
+  .form-group input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 14px; font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none;
+  }
+  .form-group input::placeholder { color: var(--muted); opacity: 0.6; }
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(91,141,239,0.12);
+  }
+  .form-group input.error { border-color: var(--danger); }
+  .err-msg { font-size: 11px; color: var(--danger); display: none; }
+  .err-msg.show { display: block; }
+
+  /* ── Submit button ─────────────────────────────────── */
+  .btn-pay {
+    width: 100%;
+    padding: 16px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    border: none; border-radius: 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 16px; font-weight: 700;
+    letter-spacing: 0.3px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: opacity 0.2s, transform 0.15s;
+    box-shadow: 0 4px 20px rgba(91,141,239,0.35);
+    animation: slideUp 0.4s 0.2s ease both;
+  }
+  .btn-pay:hover { opacity: 0.92; }
+  .btn-pay:active { transform: scale(0.98); }
+  .btn-pay:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  /* ── Success state ─────────────────────────────────── */
+  .success-screen {
+    display: none;
+    flex-direction: column; align-items: center; gap: 16px;
+    text-align: center; padding: 40px 20px;
+    animation: slideUp 0.5s ease both;
+  }
+  .success-screen.show { display: flex; }
+  .success-icon {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: rgba(44,182,125,0.12);
+    border: 2px solid var(--success);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 38px;
+    animation: popIn 0.5s cubic-bezier(.36,.07,.19,.97) both;
+  }
+  @keyframes popIn { 0%{transform:scale(0)} 80%{transform:scale(1.1)} 100%{transform:scale(1)} }
+  .success-screen h2 {
+    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+  }
+  .success-screen p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .success-detail {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 18px;
+    width: 100%; text-align: left; font-size: 13px;
+  }
+  .success-detail div { display: flex; justify-content: space-between; padding: 4px 0; }
+  .success-detail .sk { color: var(--muted); }
+  .success-detail .sv { font-weight: 500; }
+
+  /* ── Loading overlay ───────────────────────────────── */
+  .loader { display:none; }
+  .btn-pay.loading .loader { display:inline-block; }
+  .btn-pay.loading .btn-text { display:none; }
+  .spinner {
+    width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);
+    border-top-color:#fff;border-radius:50%;
+    animation:spin 0.7s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Security note ─────────────────────────────────── */
+  .security-note {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 11px; color: var(--muted);
+    margin-top: 12px;
+    animation: slideUp 0.4s 0.25s ease both;
+  }
+  .security-note span { font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-icon">💎</div>
+    <div class="logo-text">
+      <h1>GetVirtual AI</h1>
+      <span>Secure Payment</span>
+    </div>
+    <div class="status-badge">Live</div>
+  </div>
+
+  <!-- Main form (hidden after success) -->
+  <div id="mainContent" style="width:100%;display:flex;flex-direction:column;align-items:center;">
+
+    <!-- Order Summary -->
+    <div class="order-card">
+      <div class="label">Order Summary</div>
+      <div class="order-row">
+        <span class="key">Product</span>
+        <span class="val" id="productName">Loading...</span>
+      </div>
+      <div class="order-row">
+        <span class="key">Order ID</span>
+        <span class="val" id="orderId">#—</span>
+      </div>
+      <div class="order-row">
+        <span class="key">Amount</span>
+        <span class="val price-val" id="productPrice">₹—</span>
+      </div>
+    </div>
+
+    <!-- QR Code -->
+    <div class="qr-section">
+      <div class="qr-label">📲 Scan QR to Pay via UPI</div>
+      <div class="qr-frame">
+        <img src="qrcode.png" alt="UPI QR Code" id="qrImage"
+          onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=yourupi@bank&pn=GetVirtualAI&am=50'"/>
+      </div>
+      <div class="upi-id" onclick="copyUPI()" title="Tap to copy">📋 yourupiid@bank</div>
+      <div class="upi-hint">
+        Pay via any UPI app · After payment,<br>
+        enter your Transaction ID below
+      </div>
+    </div>
+
+    <!-- Payment Form -->
+    <div class="form-section">
+      <div class="form-group">
+        <label>Transaction ID / UTR Number</label>
+        <input type="text" id="txId" placeholder="e.g. 407123456789" autocomplete="off"/>
+        <span class="err-msg" id="txErr">Please enter a valid Transaction ID</span>
+      </div>
+      <div class="form-group">
+        <label>Amount Paid (₹)</label>
+        <input type="number" id="amountPaid" placeholder="e.g. 50" min="1" step="0.01"/>
+        <span class="err-msg" id="amtErr">Please enter the amount you paid</span>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button class="btn-pay" id="confirmBtn" onclick="confirmPayment()">
+      <span class="btn-text">✅ Confirm Payment</span>
+      <span class="loader"><div class="spinner"></div></span>
+    </button>
+
+    <div class="security-note">
+      <span>🔒</span> Your data is encrypted & secure
+    </div>
+
+  </div><!-- /mainContent -->
+
+  <!-- Success Screen -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✅</div>
+    <h2>Payment Submitted!</h2>
+    <p>Your payment details have been sent.<br>Admin will verify & deliver shortly.</p>
+    <div class="success-detail" id="successDetail"></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:8px;">
+      This window will close automatically…
+    </p>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Init Telegram WebApp ────────────────────────────────
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  // Apply Telegram theme colors if available
+  if (tg.colorScheme === 'light') {
+    document.documentElement.style.setProperty('--bg','#f4f6fb');
+    document.documentElement.style.setProperty('--surface','#eef0f7');
+    document.documentElement.style.setProperty('--card','#fff');
+    document.documentElement.style.setProperty('--text','#1a1d2e');
+    document.documentElement.style.setProperty('--muted','#6b7280');
+    document.documentElement.style.setProperty('--border','rgba(0,0,0,0.08)');
+  }
+}
+
+// ── Parse URL params ────────────────────────────────────
+const params = new URLSearchParams(window.location.search);
+const ORDER_ID    = params.get('order_id') || '0';
+const PRODUCT_KEY = params.get('product')  || 'product';
+
+// Product catalog (mirrors config.py)
+const PRODUCTS = {
+  instagram: { name: '📸 Instagram Account', price: 50  },
+  telegram:  { name: '📢 Telegram Account',  price: 100 },
+  whatsapp:  { name: '💬 WhatsApp Account',  price: 50  },
+  modapk:    { name: '📦 Mod APK',           price: 15  },
+};
+
+const product = PRODUCTS[PRODUCT_KEY] || { name: PRODUCT_KEY, price: '—' };
+
+// Populate order summary
+document.getElementById('productName').textContent = product.name;
+document.getElementById('orderId').textContent     = `#${ORDER_ID}`;
+document.getElementById('productPrice').textContent = `₹${product.price}`;
+
+// Pre-fill amount
+if (product.price !== '—') {
+  document.getElementById('amountPaid').value = product.price;
+}
+
+// ── Copy UPI ────────────────────────────────────────────
+function copyUPI() {
+  const upiText = 'yourupiid@bank'; // Replace with real UPI
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(upiText).then(() => showToast('UPI ID copied!'));
+  } else {
+    showToast('Long-press to copy');
+  }
+}
+
+function showToast(msg) {
+  // Use Telegram native if available
+  if (tg?.showPopup) {
+    tg.showPopup({ message: msg, buttons: [{ type: 'ok' }] });
+  } else {
+    alert(msg);
+  }
+}
+
+// ── Validation ──────────────────────────────────────────
+function validate() {
+  let ok = true;
+  const txVal  = document.getElementById('txId').value.trim();
+  const amtVal = parseFloat(document.getElementById('amountPaid').value);
+
+  const txInput  = document.getElementById('txId');
+  const amtInput = document.getElementById('amountPaid');
+  const txErr    = document.getElementById('txErr');
+  const amtErr   = document.getElementById('amtErr');
+
+  if (!txVal || txVal.length < 6) {
+    txInput.classList.add('error'); txErr.classList.add('show'); ok = false;
+  } else {
+    txInput.classList.remove('error'); txErr.classList.remove('show');
+  }
+
+  if (!amtVal || amtVal <= 0) {
+    amtInput.classList.add('error'); amtErr.classList.add('show'); ok = false;
+  } else {
+    amtInput.classList.remove('error'); amtErr.classList.remove('show');
+  }
+
+  return ok;
+}
+
+// ── Confirm Payment ─────────────────────────────────────
+function confirmPayment() {
+  if (!validate()) return;
+
+  const txId      = document.getElementById('txId').value.trim();
+  const amountPaid = parseFloat(document.getElementById('amountPaid').value);
+
+  const payload = JSON.stringify({
+    order_id:    ORDER_ID,
+    product:     PRODUCT_KEY,
+    tx_id:       txId,
+    amount_paid: amountPaid,
+  });
+
+  // Show loading
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  setTimeout(() => {
+    try {
+      if (tg?.sendData) {
+        tg.sendData(payload);
+      } else {
+        // Fallback: just show success (dev/desktop mode)
+        console.log('Dev mode payload:', payload);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+
+    // Show success screen
+    showSuccess(txId, amountPaid);
+  }, 600);
+}
+
+function showSuccess(txId, amount) {
+  document.getElementById('mainContent').style.display = 'none';
+
+  const successScreen = document.getElementById('successScreen');
+  successScreen.classList.add('show');
+
+  document.getElementById('successDetail').innerHTML = `
+    <div><span class="sk">Product</span><span class="sv">${product.name}</span></div>
+    <div><span class="sk">Order ID</span><span class="sv">#${ORDER_ID}</span></div>
+    <div><span class="sk">Transaction ID</span><span class="sv">${txId}</span></div>
+    <div><span class="sk">Amount</span><span class="sv">₹${amount}</span></div>
+  `;
+
+  // Auto-close after 3s
+  setTimeout(() => {
+    if (tg?.close) tg.close();
+  }, 3000);
+}
+
+// ── Real-time clear errors ──────────────────────────────
+document.getElementById('txId').addEventListener('input', () => {
+  document.getElementById('txId').classList.remove('error');
+  document.getElementById('txErr').classList.remove('show');
+});
+document.getElementById('amountPaid').addEventListener('input', () => {
+  document.getElementById('amountPaid').classList.remove('error');
+  document.getElementById('amtErr').classList.remove('show');
+});
+</script>
+</body>
+</html>
