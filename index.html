@@ -34,6 +34,7 @@
     background: var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
 
   /* ── Grid noise bg ─────────────────────────────────── */
@@ -163,7 +164,6 @@
     background: #fff;
     padding: 8px;
   }
-  /* corner accents */
   .qr-frame::before, .qr-frame::after {
     content: ''; position: absolute;
     width: 20px; height: 20px;
@@ -173,6 +173,7 @@
   }
   .qr-frame::before { top: 0; left: 0; border-width: 2px 0 0 2px; border-radius: 4px 0 0 0; }
   .qr-frame::after  { bottom: 0; right: 0; border-width: 0 2px 2px 0; border-radius: 0 0 4px 0; }
+  
   .upi-id {
     font-family: monospace; font-size: 13px;
     background: rgba(91,141,239,0.1);
@@ -211,7 +212,6 @@
     transition: border-color 0.2s, box-shadow 0.2s;
     -webkit-appearance: none;
   }
-  .form-group input::placeholder { color: var(--muted); opacity: 0.6; }
   .form-group input:focus {
     border-color: var(--accent);
     box-shadow: 0 0 0 3px rgba(91,141,239,0.12);
@@ -238,39 +238,52 @@
   }
   .btn-pay:hover { opacity: 0.92; }
   .btn-pay:active { transform: scale(0.98); }
-  .btn-pay:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .btn-pay:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
 
-  /* ── Success state ─────────────────────────────────── */
+  /* ── Success Screen & Animations ────────────────────── */
   .success-screen {
     display: none;
     flex-direction: column; align-items: center; gap: 16px;
     text-align: center; padding: 40px 20px;
-    animation: slideUp 0.5s ease both;
   }
-  .success-screen.show { display: flex; }
+  .success-screen.show { 
+    display: flex; 
+    animation: fadeInScale 0.6s cubic-bezier(0.23, 1, 0.32, 1) both;
+  }
+  @keyframes fadeInScale {
+    from { opacity: 0; transform: scale(0.9) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
   .success-icon {
     width: 80px; height: 80px; border-radius: 50%;
     background: rgba(44,182,125,0.12);
     border: 2px solid var(--success);
     display: flex; align-items: center; justify-content: center;
     font-size: 38px;
-    animation: popIn 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    margin-bottom: 10px;
+    box-shadow: 0 0 20px rgba(44,182,125,0.2);
+    animation: successPulse 2s infinite;
   }
-  @keyframes popIn { 0%{transform:scale(0)} 80%{transform:scale(1.1)} 100%{transform:scale(1)} }
-  .success-screen h2 {
-    font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800;
+  @keyframes successPulse {
+    0% { box-shadow: 0 0 0 0 rgba(44,182,125, 0.4); }
+    70% { box-shadow: 0 0 0 15px rgba(44,182,125, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(44,182,125, 0); }
   }
-  .success-screen p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
   .success-detail {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 14px 18px;
+    background: rgba(23, 30, 46, 0.6);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px;
     width: 100%; text-align: left; font-size: 13px;
   }
-  .success-detail div { display: flex; justify-content: space-between; padding: 4px 0; }
+  .success-detail div { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+  .success-detail div:last-child { border-bottom: none; }
   .success-detail .sk { color: var(--muted); }
-  .success-detail .sv { font-weight: 500; }
+  .success-detail .sv { font-weight: 500; color: var(--text); }
 
-  /* ── Loading overlay ───────────────────────────────── */
+  /* ── Loading Spinner ───────────────────────────────── */
   .loader { display:none; }
   .btn-pay.loading .loader { display:inline-block; }
   .btn-pay.loading .btn-text { display:none; }
@@ -281,14 +294,11 @@
   }
   @keyframes spin{to{transform:rotate(360deg)}}
 
-  /* ── Security note ─────────────────────────────────── */
   .security-note {
     display: flex; align-items: center; gap: 6px;
     font-size: 11px; color: var(--muted);
     margin-top: 12px;
-    animation: slideUp 0.4s 0.25s ease both;
   }
-  .security-note span { font-size: 14px; }
 </style>
 </head>
 <body>
@@ -296,8 +306,6 @@
 <div class="blob blob-2"></div>
 
 <div class="page">
-
-  <!-- Header -->
   <div class="header">
     <div class="logo-icon">💎</div>
     <div class="logo-text">
@@ -307,10 +315,7 @@
     <div class="status-badge">Live</div>
   </div>
 
-  <!-- Main form (hidden after success) -->
-  <div id="mainContent" style="width:100%;display:flex;flex-direction:column;align-items:center;">
-
-    <!-- Order Summary -->
+  <div id="mainContent" style="width:100%; display:flex; flex-direction:column; align-items:center;">
     <div class="order-card">
       <div class="label">Order Summary</div>
       <div class="order-row">
@@ -327,21 +332,19 @@
       </div>
     </div>
 
-    <!-- QR Code -->
     <div class="qr-section">
       <div class="qr-label">📲 Scan QR to Pay via UPI</div>
       <div class="qr-frame">
         <img src="qrcode.png" alt="UPI QR Code" id="qrImage"
-          onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=yourupi@bank&pn=GetVirtualAI&am=50'"/>
+          onerror="this.src='https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=upi://pay?pa=astropulsesmmpanel@gmail.com&pn=GetVirtualAI&am=50'"/>
       </div>
-      <div class="upi-id" onclick="copyUPI()" title="Tap to copy">📋 yourupiid@bank</div>
+      <div class="upi-id" onclick="copyUPI()" title="Tap to copy">📋 astropulsesmmpanel@gmail.com</div>
       <div class="upi-hint">
         Pay via any UPI app · After payment,<br>
         enter your Transaction ID below
       </div>
     </div>
 
-    <!-- Payment Form -->
     <div class="form-section">
       <div class="form-group">
         <label>Transaction ID / UTR Number</label>
@@ -355,7 +358,6 @@
       </div>
     </div>
 
-    <!-- Submit -->
     <button class="btn-pay" id="confirmBtn" onclick="confirmPayment()">
       <span class="btn-text">✅ Confirm Payment</span>
       <span class="loader"><div class="spinner"></div></span>
@@ -364,45 +366,30 @@
     <div class="security-note">
       <span>🔒</span> Your data is encrypted & secure
     </div>
+  </div>
 
-  </div><!-- /mainContent -->
-
-  <!-- Success Screen -->
   <div class="success-screen" id="successScreen">
     <div class="success-icon">✅</div>
     <h2>Payment Submitted!</h2>
-    <p>Your payment details have been sent.<br>Admin will verify & deliver shortly.</p>
+    <p>Admin will verify & deliver shortly.<br>You can safely close this window.</p>
     <div class="success-detail" id="successDetail"></div>
-    <p style="font-size:12px;color:var(--muted);margin-top:8px;">
-      This window will close automatically…
+    <p style="font-size:12px;color:var(--muted);margin-top:12px; font-style:italic;">
+      Closing automatically in 4 seconds...
     </p>
   </div>
-
-</div><!-- /page -->
+</div>
 
 <script>
-// ── Init Telegram WebApp ────────────────────────────────
 const tg = window.Telegram?.WebApp;
 if (tg) {
   tg.ready();
   tg.expand();
-  // Apply Telegram theme colors if available
-  if (tg.colorScheme === 'light') {
-    document.documentElement.style.setProperty('--bg','#f4f6fb');
-    document.documentElement.style.setProperty('--surface','#eef0f7');
-    document.documentElement.style.setProperty('--card','#fff');
-    document.documentElement.style.setProperty('--text','#1a1d2e');
-    document.documentElement.style.setProperty('--muted','#6b7280');
-    document.documentElement.style.setProperty('--border','rgba(0,0,0,0.08)');
-  }
 }
 
-// ── Parse URL params ────────────────────────────────────
 const params = new URLSearchParams(window.location.search);
-const ORDER_ID    = params.get('order_id') || '0';
+const ORDER_ID    = params.get('order_id') || Math.floor(1000 + Math.random() * 9000);
 const PRODUCT_KEY = params.get('product')  || 'product';
 
-// Product catalog (mirrors config.py)
 const PRODUCTS = {
   instagram: { name: '📸 Instagram Account', price: 50  },
   telegram:  { name: '📢 Telegram Account',  price: 100 },
@@ -410,104 +397,94 @@ const PRODUCTS = {
   modapk:    { name: '📦 Mod APK',           price: 15  },
 };
 
-const product = PRODUCTS[PRODUCT_KEY] || { name: PRODUCT_KEY, price: '—' };
+const product = PRODUCTS[PRODUCT_KEY] || { name: PRODUCT_KEY, price: '50' };
 
-// Populate order summary
 document.getElementById('productName').textContent = product.name;
 document.getElementById('orderId').textContent     = `#${ORDER_ID}`;
 document.getElementById('productPrice').textContent = `₹${product.price}`;
+document.getElementById('amountPaid').value = product.price;
 
-// Pre-fill amount
-if (product.price !== '—') {
-  document.getElementById('amountPaid').value = product.price;
-}
-
-// ── Copy UPI ────────────────────────────────────────────
 function copyUPI() {
-  const upiText = 'yourupiid@bank'; // Replace with real UPI
-  if (navigator.clipboard) {
-    navigator.clipboard.writeText(upiText).then(() => showToast('UPI ID copied!'));
-  } else {
-    showToast('Long-press to copy');
-  }
+  const upiText = 'astropulsesmmpanel@gmail.com';
+  navigator.clipboard.writeText(upiText).then(() => {
+    if (tg?.showPopup) tg.showPopup({ message: 'UPI ID copied!' });
+    else alert('UPI ID copied!');
+  });
 }
 
-function showToast(msg) {
-  // Use Telegram native if available
-  if (tg?.showPopup) {
-    tg.showPopup({ message: msg, buttons: [{ type: 'ok' }] });
-  } else {
-    alert(msg);
-  }
-}
-
-// ── Validation ──────────────────────────────────────────
 function validate() {
   let ok = true;
-  const txVal  = document.getElementById('txId').value.trim();
+  const txVal = document.getElementById('txId').value.trim();
   const amtVal = parseFloat(document.getElementById('amountPaid').value);
-
-  const txInput  = document.getElementById('txId');
-  const amtInput = document.getElementById('amountPaid');
-  const txErr    = document.getElementById('txErr');
-  const amtErr   = document.getElementById('amtErr');
-
-  if (!txVal || txVal.length < 6) {
-    txInput.classList.add('error'); txErr.classList.add('show'); ok = false;
-  } else {
-    txInput.classList.remove('error'); txErr.classList.remove('show');
+  
+  if (txVal.length < 6) {
+    document.getElementById('txId').classList.add('error');
+    document.getElementById('txErr').classList.add('show');
+    ok = false;
   }
-
   if (!amtVal || amtVal <= 0) {
-    amtInput.classList.add('error'); amtErr.classList.add('show'); ok = false;
-  } else {
-    amtInput.classList.remove('error'); amtErr.classList.remove('show');
+    document.getElementById('amountPaid').classList.add('error');
+    document.getElementById('amtErr').classList.add('show');
+    ok = false;
   }
-
   return ok;
 }
 
-// ── Confirm Payment ─────────────────────────────────────
-function confirmPayment() {
+// ── FormSubmit.co Logic ─────────────────────────────────
+async function sendEmailNotification(txId, amount) {
+  const endpoint = "https://formsubmit.co/ajax/astropulsesmmpanel@gmail.com";
+  
+  try {
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        _subject: `New Payment Received: #${ORDER_ID}`,
+        Product: product.name,
+        OrderID: ORDER_ID,
+        TransactionID: txId,
+        AmountPaid: `₹${amount}`,
+        _captcha: "false"
+      })
+    });
+    return response.ok;
+  } catch (e) {
+    console.error("Email error:", e);
+    return false;
+  }
+}
+
+async function confirmPayment() {
   if (!validate()) return;
 
-  const txId      = document.getElementById('txId').value.trim();
-  const amountPaid = parseFloat(document.getElementById('amountPaid').value);
+  const txId = document.getElementById('txId').value.trim();
+  const amountPaid = document.getElementById('amountPaid').value;
 
-  const payload = JSON.stringify({
-    order_id:    ORDER_ID,
-    product:     PRODUCT_KEY,
-    tx_id:       txId,
-    amount_paid: amountPaid,
-  });
-
-  // Show loading
   const btn = document.getElementById('confirmBtn');
   btn.disabled = true;
   btn.classList.add('loading');
 
-  setTimeout(() => {
-    try {
-      if (tg?.sendData) {
-        tg.sendData(payload);
-      } else {
-        // Fallback: just show success (dev/desktop mode)
-        console.log('Dev mode payload:', payload);
-      }
-    } catch (e) {
-      console.error(e);
-    }
+  // Send to email via FormSubmit
+  await sendEmailNotification(txId, amountPaid);
 
-    // Show success screen
+  // Small delay for animation feel
+  setTimeout(() => {
+    const payload = JSON.stringify({
+      order_id: ORDER_ID,
+      tx_id: txId,
+      amount: amountPaid
+    });
+
+    if (tg?.sendData) tg.sendData(payload);
+
     showSuccess(txId, amountPaid);
-  }, 600);
+  }, 1000);
 }
 
 function showSuccess(txId, amount) {
   document.getElementById('mainContent').style.display = 'none';
-
-  const successScreen = document.getElementById('successScreen');
-  successScreen.classList.add('show');
+  const screen = document.getElementById('successScreen');
+  screen.classList.add('show');
 
   document.getElementById('successDetail').innerHTML = `
     <div><span class="sk">Product</span><span class="sv">${product.name}</span></div>
@@ -516,20 +493,15 @@ function showSuccess(txId, amount) {
     <div><span class="sk">Amount</span><span class="sv">₹${amount}</span></div>
   `;
 
-  // Auto-close after 3s
   setTimeout(() => {
     if (tg?.close) tg.close();
-  }, 3000);
+  }, 4000);
 }
 
-// ── Real-time clear errors ──────────────────────────────
-document.getElementById('txId').addEventListener('input', () => {
-  document.getElementById('txId').classList.remove('error');
+// Clear errors on input
+document.getElementById('txId').addEventListener('input', (e) => {
+  e.target.classList.remove('error');
   document.getElementById('txErr').classList.remove('show');
-});
-document.getElementById('amountPaid').addEventListener('input', () => {
-  document.getElementById('amountPaid').classList.remove('error');
-  document.getElementById('amtErr').classList.remove('show');
 });
 </script>
 </body>
